@@ -15,6 +15,7 @@ structlog = "^24.1"
 pydantic = "^2.7"
 python-dotenv = "^1.0"
 telethon = { version = "^1.36", optional = true }
+cryptg = { version = "^0.4", optional = true }
 playwright = { version = "^1.45", optional = true }
 scrapy = { version = "^2.11", optional = true }
 streamlit = { version = "^1.36", optional = true }
@@ -22,12 +23,12 @@ ollama = { version = "^0.2", optional = true }
 tldextract = "^5.1"
 
 [tool.poetry.extras]
-telegram = ["telethon"]
+telegram = ["telethon", "cryptg"]
 browser = ["playwright"]
 scrapy = ["scrapy"]
 dashboard = ["streamlit"]
 llm = ["ollama"]
-all = ["telethon", "playwright", "scrapy", "streamlit", "ollama"]
+all = ["telethon", "cryptg", "playwright", "scrapy", "streamlit", "ollama"]
 
 [tool.poetry.scripts]
 osint-process = "osint.cli.process:main"

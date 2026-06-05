@@ -45,6 +45,11 @@ data/osint.db-journal
 .scrapy/
 *.har
 
+# ---------- Telegram sessions (MTProto auth tokens) ----------
+*.session
+*.session-journal
+sessions/
+
 # ---------- IDE / OS ----------
 .idea/
 .vscode/
