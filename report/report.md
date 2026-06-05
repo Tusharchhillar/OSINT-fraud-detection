@@ -132,20 +132,59 @@ events are traceable end-to-end via `trace_id`.
 - Bootstrapped `.gitignore` (Python, `.env`, `data/`, Playwright caches, IDE files).
 - Initialized local git repo *(pending remote setup — see TODO below).*
 
-### Week 2 — *(to be filled in)*
+### Week 2 — M1 Foundations *(delivered in this commit range)*
+- **`pyproject.toml`** — Poetry-managed project, optional dep groups for `telegram`,
+  `browser`, `scrapy`, `dashboard`, `llm`, and `all`, plus `osint-process` /
+  `osint-scrape` / `osint-dashboard` console scripts. Dev group includes `pytest`,
+  `pytest-cov`, and `ruff`. Tooling configured: line-length 100, target Python 3.11.
+- **`.env.example`** — every config key documented (`OSINT_*`, `TELEGRAM_*`,
+  `SCRAPER_*`); secrets are gitignored.
+- **`src/osint/config.py`** — `Settings` dataclass loaded once via `lru_cache`;
+  monkeypatchable in tests.
+- **`src/osint/logging_setup.py`** — `structlog` configured to emit one JSON
+  object per line to **stdout** and to mirror to the raw NDJSON audit file.
+  Idempotent — safe to call from any entrypoint.
+- **`src/osint/schemas.py`** — `RawEvent` and `EnrichedEvent` Pydantic v2 models
+  with a stable `event_id = <platform>-<sha1[:12]>`, automatic URL extraction
+  from text, and a strict `risk_score` 0–100 range on enriched events.
+- **`src/osint/processing/store.py`** — dual-write store: append-only NDJSON
+  audit log + idempotent SQLite (`INSERT OR IGNORE` on `event_id`).
+- **`src/osint/processing/clean.py`** — Pandas-based dedupe, empty-row and
+  emoji-only filtering, URL normalization (tracker stripping, host lowercasing).
+- **`src/osint/cli/process.py`**, **`scrape.py`**, **`dashboard.py`** — CLI
+  entry points. `osint-process --seed` inserts a representative demo set
+  across all four platforms and prints a one-line JSON log per stage.
+- **`tests/`** — 14 unit tests (schemas, store, cleaner), **all green**.
 
-### Week 3 — *(to be filled in)*
+**Smoke verification (M1):**
+- `pytest -v` → 14/14 passed in ~1s.
+- `python -m osint.cli.process --seed` → 4 events written; `data/raw/events.ndjson`
+  contains 4 JSON lines with URLs auto-extracted; `data/osint.db` has 4 rows.
+- `osint-scrape` and `osint-dashboard` return a clear "not implemented" warning
+  pointing at M2/M3/M6 — no silent stub failures.
 
-### Week 4 — *(to be filled in)*
+**What I learned / decisions to remember:**
+- `structlog.PrintLoggerFactory` is the cleanest way to keep one JSON object per
+  line on stdout without losing the stdlib `logging.FileHandler` mirror.
+- The audit log keeps every observation (duplicates included); the SQLite view
+  is the deduplicated, queryable one. This split is useful when we add the
+  analyzer in M5 — we can re-score every observation cheaply.
+- Pydantic v2 + pandas: `model_dump()` → `DataFrame` → `model_validate()` needs
+  an explicit `timestamp.to_pydatetime()` coercion. Worth remembering for M4.
+- For the M1 emoji filter, "has at least one alpha char" turned out to be a
+  better policy than the original "short emoji-only" rule.
 
-### Week 5 — *(to be filled in)*
+### Week 3 — *(planned: M2 Telegram scraper)*
 
-### Week 6 — *(to be filled in)*
+### Week 4 — *(planned: M3 Instagram / X / WhatsApp scrapers)*
 
-### Week 7 — *(to be filled in)*
+### Week 5 — *(planned: M4 processing pipeline + heuristics)*
 
-### Week 8 — Wrap-up
-- Final report pass, screenshots of the dashboard, results, and conclusion.
+### Week 6 — *(planned: M5 Ollama intent analysis)*
+
+### Week 7 — *(planned: M6 Streamlit dashboard)*
+
+### Week 8 — *(planned: M7 hardening + final report pass)*
 
 ---
 

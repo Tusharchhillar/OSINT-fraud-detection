@@ -1,0 +1,56 @@
+[tool.poetry]
+name = "smart-osint-fraud-intel"
+version = "0.1.0"
+description = "OSINT detection tool that surfaces illicit communities and scams across Telegram, Instagram, X, and WhatsApp."
+authors = ["Tushar Chhillar <chhillar.tushar1@gmail.com>"]
+readme = "README.md"
+license = "MIT"
+package-mode = true
+
+[tool.poetry.dependencies]
+python = "^3.11"
+pandas = "^2.2"
+pyarrow = "^15.0"        # optional but cheap; speeds up pandas IO later
+structlog = "^24.1"
+pydantic = "^2.7"
+python-dotenv = "^1.0"
+telethon = { version = "^1.36", optional = true }
+playwright = { version = "^1.45", optional = true }
+scrapy = { version = "^2.11", optional = true }
+streamlit = { version = "^1.36", optional = true }
+ollama = { version = "^0.2", optional = true }
+tldextract = "^5.1"
+
+[tool.poetry.extras]
+telegram = ["telethon"]
+browser = ["playwright"]
+scrapy = ["scrapy"]
+dashboard = ["streamlit"]
+llm = ["ollama"]
+all = ["telethon", "playwright", "scrapy", "streamlit", "ollama"]
+
+[tool.poetry.scripts]
+osint-process = "osint.cli.process:main"
+osint-scrape  = "osint.cli.scrape:main"
+osint-dashboard = "osint.cli.dashboard:main"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.2"
+pytest-cov = "^5.0"
+ruff = "^0.5"
+
+[build-system]
+requires = ["poetry-core>=1.9.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "N"]
+ignore = ["E501"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
