@@ -3,8 +3,8 @@
 > **Programme:** GPCSSI 2026 — Final Project
 > **Author:** Tushar Chhillar
 > **Mentor / Org:** *(to fill in)*
-> **Repository:** *(GitHub link to be added once the remote is created)*
-> **Document status:** Draft v0.1 — updated as the project progresses.
+> **Repository:** <https://github.com/Tusharchhillar/OSINT-fraud-detection>
+> **Document status:** Draft v0.2 — updated as the project progresses.
 
 ---
 
@@ -173,6 +173,72 @@ events are traceable end-to-end via `trace_id`.
   an explicit `timestamp.to_pydatetime()` coercion. Worth remembering for M4.
 - For the M1 emoji filter, "has at least one alpha char" turned out to be a
   better policy than the original "short emoji-only" rule.
+
+### Week 2b — M1 Tweaks *(post-review upgrade)*
+
+Four reviewer-driven upgrades landed before the first push to GitHub, in one
+focused session:
+
+- **Schema (`src/osint/schemas.py`)** — added two new fields to `RawEvent`:
+  - `language: str | None` — ISO-639-1 code; stays `None` for M1, populated by
+    the cleaner in M4.
+  - `content_hash: str | None` — sha256 of `lower(text) + sorted(URL stems)`.
+    Stable across `utm_*` tracker variations and case-only differences, so M4
+    can group paraphrased scam templates cheaply.
+  - `make_content_hash()` exposed at module level for direct use in tests.
+  - SQLite table gained two new columns + an index on `content_hash`.
+
+- **Cleaner (`src/osint/processing/clean.py`)** — two new rules:
+  - **Min-length rule**: drop rows where stripped text is shorter than 4 chars
+    *and* there are no URLs/media to anchor on. Catches `ok`, `hi`, `👍`
+    that the alpha-char rule alone would let through.
+  - **Shortener flag**: a `_KNOWN_SHORTENERS` set (`bit.ly`, `t.co`,
+    `tinyurl.com`, `goo.gl`, `ow.ly`, `is.gd`, `buff.ly`, `rebrand.ly`,
+    `cutt.ly`, `shorturl.at`, `rb.gy`). When a URL's host matches, the cleaner
+    appends a `*.<host>` marker to the event's URL list. Markers start with
+    `*.` so they cannot be confused with real links by downstream consumers;
+    M5 heuristics will treat them as risk indicators.
+  - Cleaner now logs per-step drop counts in a single `osint.cleaner.run` event.
+
+- **Logging (`src/osint/logging_setup.py`)** — two new processors:
+  - `_add_static` — stamps every line with `service: osint`. Multi-service
+    log aggregators can now filter by service without parsing event names.
+  - `_prefix_event_name` — auto-prefixes the `event` field with `osint.`
+    unless the caller already used the full form. This means call sites can
+    stay short (`log.info("store.upsert", ...)`) and the wire format is
+    consistent (`osint.store.upsert`). Every log line is now self-describing.
+  - All existing call sites in `clean.py`, `store.py`, and the `cli/`
+    scripts updated to the new namespace.
+
+- **Store (`src/osint/processing/store.py`)** — disk-friendly upgrades:
+  - **NDJSON rotation**: `OSINT_NDJSON_ROTATE_BYTES` (default 50 MB) controls
+    the threshold. When the active `events.ndjson` exceeds it, the file is
+    gzipped to `events-<UTC-timestamp>.ndjson.gz` and a fresh empty file is
+    started. The active file keeps streaming without blocking.
+  - **`Store.export_parquet(path=None)`**: dumps the entire events table to
+    a Parquet file (default: `data/osint.parquet`). The M6 dashboard will
+    read this for fast columnar loads. Skips cleanly if `pyarrow` is not
+    installed.
+
+**Verification after tweaks:**
+- `pytest -v` → **30/30 passed** in ~1.4s (was 14; added 16 new tests).
+- Live smoke: `osint-process --seed` emits 4 events, every log line carries
+  `"service": "osint"` and `osint.*` event names, SQLite has the new
+  `language` and `content_hash` columns populated, and `osint.parquet` is
+  written.
+- `Store.export_parquet()` is round-tripped through `pd.read_parquet` in tests.
+
+**Decisions to remember:**
+- `content_hash` lowercases text and strips query strings from URLs before
+  hashing. This is deliberate — paraphrase-grouping in M4 depends on it.
+- Shortener *flagging* (free) vs shortener *expansion* (network calls) is a
+  policy choice. We default to flagging; expansion is opt-in for M5.
+- The `osint.*` event prefix is enforced by the processor, not by discipline.
+  If a future contributor writes `log.info("foo")`, the wire format is
+  `osint.foo` — no silent drift.
+- NDJSON rotation gzips the *previous* file, not the in-flight writes.
+  `iter_ndjson()` only reads the active file; reading rotated history is
+  opt-in (a future method).
 
 ### Week 3 — *(planned: M2 Telegram scraper)*
 
