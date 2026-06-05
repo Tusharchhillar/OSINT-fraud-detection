@@ -63,6 +63,12 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Max events to capture per channel.",
     )
     parser.add_argument(
+        "--session",
+        default=None,
+        help="Telegram session name (overrides TELEGRAM_SESSION in .env). "
+             "Use the session you bootstrapped with scripts/bootstrap_telegram_session.py.",
+    )
+    parser.add_argument(
         "--no-clean",
         action="store_true",
         help="Skip the Pandas cleaner; persist raw events as-is.",
@@ -97,9 +103,9 @@ def _events_for(args: argparse.Namespace) -> Iterable[RawEvent]:
                 per_channel_limit=args.limit,
             )
         if args.channels_file:
-            return run_from_file(args.channels_file, limit=args.limit)
+            return run_from_file(args.channels_file, limit=args.limit, session_name=args.session)
         if args.channel:
-            return TelegramScraper().run(args.channel, limit=args.limit)
+            return TelegramScraper(session_name=args.session).run(args.channel, limit=args.limit)
         log.warning(
             "osint.cli.scrape.no_target",
             platform=args.platform,

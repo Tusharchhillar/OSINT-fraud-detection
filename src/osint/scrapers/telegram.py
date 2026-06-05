@@ -295,12 +295,14 @@ class TelegramScraper(BaseScraper):
 # ---------- module-level helpers (used by the CLI) ----------
 
 
-def run_from_file(path: str | Path, *, limit: int = 100) -> Iterator[RawEvent]:
+def run_from_file(
+    path: str | Path, *, limit: int = 100, session_name: str | None = None
+) -> Iterator[RawEvent]:
     """Read a text file with one channel per line, scrape each, yield events."""
     p = Path(path)
     targets = [line.strip() for line in p.read_text(encoding="utf-8").splitlines() if line.strip()]
     log.info("osint.scraper.telegram.batch_start", file=str(p), count=len(targets), limit=limit)
-    scraper = TelegramScraper()
+    scraper = TelegramScraper(session_name=session_name)
     try:
         events = asyncio.run(scraper.arun_many(targets, limit=limit))
     finally:
