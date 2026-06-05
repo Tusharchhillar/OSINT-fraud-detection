@@ -1,0 +1,79 @@
+[
+  {
+    "id": 1001,
+    "message": "Join our VIP channel for 10x crypto returns! https://t.me/joinchat/abc123",
+    "date": "2026-06-01T10:00:00+00:00",
+    "views": 1234,
+    "forwards": 5,
+    "post_author": null,
+    "reply_to": null,
+    "media": null,
+    "sender": {
+      "id": 555000111,
+      "username": "promo_bot",
+      "first_name": "Promo",
+      "last_name": "Bot"
+    },
+    "entity": {
+      "id": -1001234567890,
+      "username": "scam_promos",
+      "title": "Promo Channel"
+    }
+  },
+  {
+    "id": 1002,
+    "message": "DM me to claim your $500 gift card",
+    "date": "2026-06-01T11:30:00+00:00",
+    "views": 800,
+    "forwards": 0,
+    "post_author": null,
+    "reply_to": null,
+    "media": {"_": "MessageMediaPhoto"},
+    "sender": {
+      "id": 555000222,
+      "username": "promo_page",
+      "first_name": "Promo",
+      "last_name": "Page"
+    },
+    "entity": {
+      "id": -1001234567890,
+      "username": "scam_promos",
+      "title": "Promo Channel"
+    }
+  },
+  {
+    "id": 1003,
+    "message": "🔥🔥🔥",
+    "date": "2026-06-01T12:00:00+00:00",
+    "views": 12,
+    "forwards": 0,
+    "post_author": null,
+    "reply_to": null,
+    "media": null,
+    "sender": null,
+    "entity": {
+      "id": -1001234567890,
+      "username": "scam_promos",
+      "title": "Promo Channel"
+    }
+  },
+  {
+    "id": 1004,
+    "message": "Click here: https://bit.ly/abc and https://t.co/xyz",
+    "date": "2026-06-01T13:00:00+00:00",
+    "views": 2500,
+    "forwards": 15,
+    "post_author": null,
+    "reply_to": {"reply_to_msg_id": 1001},
+    "media": null,
+    "sender": {
+      "id": 555000333,
+      "username": "spammer"
+    },
+    "entity": {
+      "id": -1001234567890,
+      "username": "scam_promos",
+      "title": "Promo Channel"
+    }
+  }
+]

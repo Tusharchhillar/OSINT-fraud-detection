@@ -1,0 +1,10 @@
+# Telegram channels used for live integration tests and smoke runs.
+# Only public channels. One handle per line, no leading '@' required.
+#
+# @telegram    — Telegram's own announcements channel (sanity check, very high volume).
+# @durov       — Pavel Durov's personal channel (low volume, very stable).
+#
+# The live integration test in tests/test_telegram.py uses these by default.
+# Replace or extend with your own target list when running real research.
+telegram
+durov

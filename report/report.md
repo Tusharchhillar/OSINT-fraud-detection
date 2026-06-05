@@ -240,7 +240,59 @@ focused session:
   `iter_ndjson()` only reads the active file; reading rotated history is
   opt-in (a future method).
 
-### Week 3 — *(planned: M2 Telegram scraper)*
+### Week 3 — M2 Telegram Scraper *(delivered)*
+
+- **`src/osint/scrapers/base.py`** — `BaseScraper` ABC with a `run(target, limit)`
+  contract and a `REGISTRY` keyed by `platform` name. New platforms drop in
+  with one `@register` decorator; the CLI dispatcher looks them up by name.
+- **`src/osint/scrapers/telegram.py`** — full Telethon-based scraper with three
+  run modes:
+  - `--channel @handle` → `TelegramScraper.run()`.
+  - `--channels-file lists/telegram_test.txt` → `run_from_file()`.
+  - `--search "keyword" --discover-limit N` → `discover_and_run()`, which uses
+    `contacts.SearchRequest` to find public channels matching a keyword, then
+    scrapes the top N.
+  - Honors Telethon's `flood-wait` guidance and self-throttles to
+    `Settings.rate_per_min` (default 20/min → ~3s between fetches).
+  - Reads `TELEGRAM_API_ID` / `TELEGRAM_API_HASH` from `Settings`; raises a
+    friendly `RuntimeError` if they're unset.
+  - Lazy-imports Telethon so the rest of the package works even when the
+    `telegram` extra isn't installed.
+- **`src/osint/cli/scrape.py`** — dispatcher rewritten around `BaseScraper`.
+  - For `telegram`: dispatches to single-channel / channels-file / search
+    based on flags, runs the events through the cleaner, and persists to
+    `Store`.
+  - For `instagram` / `x` / `whatsapp`: emits a `osint.cli.scrape.not_implemented`
+    warning and exits 0 with `no_events` (M3).
+- **`lists/telegram_test.txt`** — sanity-check target list with `@telegram` and
+  `@durov`. Used by the live integration test and any ad-hoc smoke run.
+- **`tests/fixtures/telegram/messages.json`** — four recorded Telethon messages
+  (clean text, photo media, emoji-only noise, replied-to message with shortener
+  URLs) replayed by the test suite. No network required.
+- **`tests/test_telegram.py`** — six tests:
+  - 5 fixture-replay tests (always run, fast): URL extraction, source naming,
+    media marker, null-sender handling, reply-to metadata, username→id fallback.
+  - 1 live integration test, **auto-skipped** unless `TELEGRAM_API_ID` /
+    `TELEGRAM_API_HASH` are set in `.env`. When enabled, it scrapes 3 messages
+    from `@telegram` and asserts the `RawEvent` shape.
+
+**Verification:**
+- `pytest -v` → **35/35 passed**, 1 live test skipped (no creds in this env).
+- CLI smoke: `osint-scrape telegram --channel @foo` → clean `RuntimeError` with
+  pointer to `my.telegram.org`; `osint-scrape instagram --channel foo` → M3
+  warning + `no_events`; `osint-process --seed` still works end-to-end.
+
+**Decisions to remember:**
+- `_author_name` priority: human name (`first_name + last_name`) > `title` >
+  `username` > `id:N`. A bare username is a weaker signal than a real name, so
+  it ranks below the human-name path.
+- The scraper uses `getattr(media, "_", type(media).__name__)` for the media
+  marker. Telethon's `MessageMedia*` classes all carry a `._` discriminator
+  field; the `type(...).__name__` fallback keeps fixture replay working with
+  duck-typed objects.
+- The live integration test uses session name `osint_test_session` (separate
+  from the default `osint_session`) so a failed test run never poisons the
+  developer's main session file.
 
 ### Week 4 — *(planned: M3 Instagram / X / WhatsApp scrapers)*
 
