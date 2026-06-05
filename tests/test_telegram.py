@@ -112,13 +112,21 @@ def test_live_scrape_public_channel() -> None:
     """Scrape a few messages from @telegram and confirm the event shape.
 
     This is a real network call. It is auto-skipped unless Telegram creds are
-    in the environment.
+    in the environment. If Telegram returns a FloodWaitError (rate-limit), the
+    test is skipped rather than failed — the test isn't about hitting the API
+    hard, it's about confirming the round-trip works.
     """
     from osint.scrapers.telegram import TelegramScraper
 
     scraper = TelegramScraper(session_name="osint_test_session")
     try:
-        events = asyncio.run(scraper.arun("telegram", limit=3))
+        try:
+            events = asyncio.run(scraper.arun("telegram", limit=3))
+        except Exception as exc:
+            msg = str(exc).lower()
+            if "flood" in msg or "wait of" in msg or "seconds is required" in msg:
+                pytest.skip(f"Telegram rate-limited the live test: {exc}")
+            raise
     finally:
         scraper.close()
 

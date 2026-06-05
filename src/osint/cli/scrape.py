@@ -1,19 +1,19 @@
 """``osint-scrape`` — dispatch to a platform scraper and persist results.
 
-Supported platforms depend on which scraper modules are installed. Currently:
+Supported platforms:
 
-* ``telegram`` — implemented in M2 (Telethon, optional extra).
-* ``instagram``, ``x``, ``whatsapp`` — land in M3.
+* ``telegram``  — M2 (Telethon, optional extra).
+* ``instagram`` — M3 (Playwright; public hashtag / profile / location / post).
+* ``x``         — M3 (Playwright; nitter-first, x.com fallback).
+* ``whatsapp``  — M3 (Playwright; public invite-link metadata only).
 
-Three run modes for any platform that supports them:
+Run modes:
 
-* ``--channel @handle``         — single target.
-* ``--channels-file path.txt``  — one target per line.
-* ``--search "keyword"``        — discovery mode (Telegram only for M2).
+* ``--channel TARGET``          — single target (any platform).
+* ``--channels-file path.txt``  — one target per line (telegram only).
+* ``--search "keyword"``        — discovery mode (telegram only).
 
-Events are written to the ``Store`` (NDJSON + SQLite). On any platform that
-isn't implemented, the CLI exits with code 2 and a clear ``not_implemented``
-log line — never a silent stub failure.
+Events are written to the ``Store`` (NDJSON + SQLite) after the cleaner runs.
 """
 
 from __future__ import annotations
@@ -72,39 +72,66 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 def _events_for(args: argparse.Namespace) -> Iterable[RawEvent]:
     """Dispatch to the right scraper entry point and return an iterable of events."""
-    if args.platform != "telegram":
+    if args.platform not in ("telegram", "instagram", "x", "whatsapp"):
         log.warning(
             "osint.cli.scrape.not_implemented",
             platform=args.platform,
-            hint=f"Scraper for {args.platform!r} lands in a later milestone (M3).",
+            hint=f"Scraper for {args.platform!r} lands in a later milestone.",
         )
         return []
 
-    # Importing inside the function keeps the CLI importable even when the
-    # `telegram` extra isn't installed.
-    from osint.scrapers.telegram import (  # type: ignore[import-not-found]
-        TelegramScraper,
-        discover_and_run,
-        run_from_file,
-    )
-
-    if args.search:
-        return discover_and_run(
-            args.search,
-            discover_limit=args.discover_limit,
-            per_channel_limit=args.limit,
+    # Importing the scraper module here (a) keeps the CLI importable when an
+    # optional extra isn't installed, and (b) triggers the scraper's
+    # @register decorator so it appears in the BaseScraper registry.
+    if args.platform == "telegram":
+        from osint.scrapers.telegram import (  # type: ignore[import-not-found]
+            TelegramScraper,
+            discover_and_run,
+            run_from_file,
         )
-    if args.channels_file:
-        return run_from_file(args.channels_file, limit=args.limit)
-    if args.channel:
-        return TelegramScraper().run(args.channel, limit=args.limit)
 
-    log.warning(
-        "osint.cli.scrape.no_target",
-        platform=args.platform,
-        hint="pass --channel, --channels-file, or --search",
-    )
-    return []
+        if args.search:
+            return discover_and_run(
+                args.search,
+                discover_limit=args.discover_limit,
+                per_channel_limit=args.limit,
+            )
+        if args.channels_file:
+            return run_from_file(args.channels_file, limit=args.limit)
+        if args.channel:
+            return TelegramScraper().run(args.channel, limit=args.limit)
+        log.warning(
+            "osint.cli.scrape.no_target",
+            platform=args.platform,
+            hint="pass --channel, --channels-file, or --search",
+        )
+        return []
+
+    if args.platform == "instagram":
+        from osint.scrapers.instagram import InstagramScraper  # type: ignore[import-not-found]
+
+        if not args.channel:
+            log.warning("osint.cli.scrape.no_target", platform=args.platform, hint="pass --channel")
+            return []
+        return InstagramScraper().run(args.channel, limit=args.limit)
+
+    if args.platform == "x":
+        from osint.scrapers.x import XScraper  # type: ignore[import-not-found]
+
+        if not args.channel:
+            log.warning("osint.cli.scrape.no_target", platform=args.platform, hint="pass --channel")
+            return []
+        return XScraper().run(args.channel, limit=args.limit)
+
+    if args.platform == "whatsapp":
+        from osint.scrapers.whatsapp import WhatsAppScraper  # type: ignore[import-not-found]
+
+        if not args.channel:
+            log.warning("osint.cli.scrape.no_target", platform=args.platform, hint="pass --channel")
+            return []
+        return WhatsAppScraper().run(args.channel, limit=args.limit)
+
+    return []  # unreachable; argparse already validated the choice
 
 
 def main(argv: list[str] | None = None) -> int:

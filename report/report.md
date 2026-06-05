@@ -294,7 +294,80 @@ focused session:
   from the default `osint_session`) so a failed test run never poisons the
   developer's main session file.
 
-### Week 4 — *(planned: M3 Instagram / X / WhatsApp scrapers)*
+### Week 4 — M3 Instagram / X / WhatsApp Scrapers *(delivered)*
+
+- **`src/osint/scrapers/browser.py`** — shared Playwright helper. One
+  headless Chromium is created lazily and reused across scraper calls within
+  the same process. Honors `Settings.rate_per_min` between navigations.
+  Exposes a `browser_page(url, wait_ms=...)` context manager so the
+  individual scrapers never touch the Playwright API directly.
+- **`src/osint/scrapers/instagram.py`** — `InstagramScraper` with four target
+  shapes detected from the `--channel` argument:
+  - `#hashtag`  → `/explore/tags/<hashtag>/`
+  - `@username` → `/<username>/`
+  - `loc:<id>`  → `/explore/locations/<id>/`
+  - `post:<shortcode>` → `/p/<shortcode>/`
+  Parser is a small regex over `alt="..."` attributes on post images — a
+  stable hook in IG's class-based DOM. Public-only, no login.
+- **`src/osint/scrapers/x.py`** — `XScraper` with **nitter-first / x.com
+  fallback** strategy (the user's pick from the clarification round). On
+  every call it cycles through a configurable list of nitter instances
+  (default: `nitter.net`, `nitter.privacydev.net`, `nitter.poast.org`,
+  `nitter.1d4.us`); the first one to return a non-empty result wins. If
+  every nitter instance fails or returns no tweets, it falls back to a
+  `x.com` public-search page and records the page `<title>` + `meta
+  description` as a single event. Target shapes: `@handle` (profile),
+  `#keyword` (hashtag), bare keyword, or full URL pass-through.
+- **`src/osint/scrapers/whatsapp.py`** — `WhatsAppScraper` reads only the
+  public `chat.whatsapp.com/<invite>` preview page: group name, description,
+  member count, preview image. No message content. Single event per invite.
+  Target shapes: full URL, `chat.whatsapp.com/<code>`, or bare invite code.
+- **`src/osint/cli/scrape.py`** — dispatcher rewritten. Each platform
+  imports its scraper module lazily (so missing optional extras don't break
+  the CLI), the `@register` decorator adds it to `BaseScraper.REGISTRY`.
+- **`tests/fixtures/{instagram,x,whatsapp}/`** — recorded HTML fixtures.
+  IG fixtures (hashtag + profile + post) were captured live from
+  `instagram.com`; the nitter fixture is a hand-crafted representative
+  DOM (the live `nitter.net` was returning an empty body during fixture
+  recording, which is exactly the failure mode the fallback handles).
+- **`tests/test_m3_scrapers.py`** — 24 new tests:
+  - 4 URL-detection tests per platform (valid + invalid).
+  - 4 IG run tests (hashtag / profile / post / emoji-only-cleaner).
+  - 3 X tests (parser, nitter run, x.com fallback when nitter fails).
+  - 4 WhatsApp tests (URL normalisation, OG parsing, single-event run).
+  - 1 registry sanity test.
+  - 1 E2E: importing all three M3 modules registers all four platforms
+    in `BaseScraper.REGISTRY`.
+- **`tests/conftest.py`** — added a `pytest_configure` guard that aborts
+  with a clear error if pytest is run from the wrong directory. Cheap
+  sanity check that `pyproject.toml` looks like this project.
+- **`tests/test_telegram.py`** — live test is now **flood-wait tolerant**:
+  if Telegram returns a `FloodWaitError` (which it does if the test is
+  re-run within ~90s of a previous run), the test is skipped with a
+  descriptive message rather than failed.
+
+**Verification:**
+- `python -m pytest` → **60/60 passed** in ~9s. The M3 fixtures are
+  replayed via a `browser_page` monkeypatch — no Chromium launch, no
+  network.
+- All four scrapers are registered in `BaseScraper.REGISTRY` and
+  discoverable via `osint-scrape <platform> --channel TARGET`.
+- The live Telegram test still runs (when creds are present and Telegram
+  isn't currently throttling us) and pulls real messages from `@telegram`.
+
+**Decisions to remember:**
+- M3 scrapers share `browser.py` so the Playwright lifecycle (singleton
+  browser, throttling, user-agent) is in one place. Swapping the backend
+  later (e.g. to `httpx` for X) is a one-file change.
+- IG's parser uses `alt=` attributes on post images instead of
+  class-name scraping. Class names change; alt text is the actual
+  caption that screen readers see, so it's the most stable hook.
+- The X scraper treats a `nitter` empty-body response as a failure and
+  tries the next instance. If all instances are empty, the x.com fallback
+  runs and emits at least one event from the page title/description —
+  better than failing the entire scrape.
+- WhatsApp is intentionally limited to invite metadata. Anything that
+  would require joining the group is out of scope.
 
 ### Week 5 — *(planned: M4 processing pipeline + heuristics)*
 
