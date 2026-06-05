@@ -40,6 +40,7 @@ def _require_telethon() -> Any:
     """Import telethon lazily, with a friendly error if it's not installed."""
     try:
         from telethon import TelegramClient  # noqa: F401  (used by callers)
+        from telethon.errors import FloodWaitError
         from telethon.tl.types import (  # noqa: F401
             Channel,
             Chat,
@@ -53,6 +54,7 @@ def _require_telethon() -> Any:
             "Chat": Chat,
             "Message": Message,
             "User": User,
+            "FloodWaitError": FloodWaitError,
         }
     except ImportError as exc:  # pragma: no cover
         raise RuntimeError(
@@ -217,6 +219,11 @@ class TelegramScraper(BaseScraper):
             cleaned = cleaned.removeprefix("https://t.me/").rstrip("/")
         try:
             entity = await client.get_entity(cleaned)
+        except telethon["FloodWaitError"]:
+            # Rate-limit is an operational signal — let the caller decide
+            # whether to back off, skip, or fail. Swallowing it would leave
+            # callers (and the live integration test) silently seeing `[]`.
+            raise
         except Exception as exc:  # Telethon raises various types
             log.warning("osint.scraper.telegram.entity_not_found", target=target, error=str(exc))
             return []

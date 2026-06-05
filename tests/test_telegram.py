@@ -96,6 +96,43 @@ def test_entity_without_username_falls_back_to_id() -> None:
     assert ev.source == f"id:{msg.entity.id}"
 
 
+def test_flood_wait_propagates_from_get_entity(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A FloodWaitError from get_entity must propagate, not be swallowed.
+
+    The live integration test's skip-on-flood logic depends on this — if
+    the scraper silently returns [] on a flood-wait, the test asserts on
+    the empty list and fails instead of skipping. We verify the re-raise
+    by injecting a fake client whose get_entity raises a stand-in
+    FloodWaitError, and by patching _require_telethon so the scraper
+    matches the stand-in class.
+    """
+    from osint.scrapers import telegram as tg_mod
+    from osint.scrapers.telegram import TelegramScraper
+
+    class _FakeFloodWaitError(Exception):
+        pass
+
+    class _FakeClient:
+        async def get_entity(self, _target: str) -> None:
+            raise _FakeFloodWaitError("A wait of 209 seconds is required")
+
+    scraper = TelegramScraper.__new__(TelegramScraper)
+    scraper._client = _FakeClient()
+
+    monkeypatch.setattr(
+        tg_mod,
+        "_require_telethon",
+        lambda: {
+            "FloodWaitError": _FakeFloodWaitError,
+            "Channel": (),
+            "Chat": (),
+        },
+    )
+
+    with pytest.raises(_FakeFloodWaitError, match="wait of 209 seconds"):
+        asyncio.run(scraper._arun_channel("telegram", limit=3))
+
+
 # ---------- live integration test (gated by env) ----------
 
 

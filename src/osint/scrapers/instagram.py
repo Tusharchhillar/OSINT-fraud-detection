@@ -108,6 +108,12 @@ def _usernames_from_html(html: str, limit: int = 10) -> list[str]:
 
 
 def _parse_hashtag(html: str, *, limit: int) -> list[RawEvent]:
+    """Extract post captions from a hashtag page.
+
+    Note: the ``source`` field is set to a placeholder here and overwritten
+    with the real hashtag in :meth:`InstagramScraper.run` once the URL is
+    known. This function only knows the captions and authors.
+    """
     captions = _caption_from_alt(html, limit=limit)
     users = _usernames_from_html(html, limit=limit)
     out: list[RawEvent] = []
@@ -116,7 +122,7 @@ def _parse_hashtag(html: str, *, limit: int) -> list[RawEvent]:
         out.append(
             RawEvent.from_scraped(
                 platform="instagram",
-                source=f"#{_HASHTAG_RE.search(caption) and '' or ''}",  # placeholder; overwritten below
+                source="hashtag:pending",  # overwritten by run() with "#<tag>"
                 text=caption,
                 author=author,
                 raw={"hashtag_index": i, "caption": caption},

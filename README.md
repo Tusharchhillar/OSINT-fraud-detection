@@ -50,10 +50,12 @@ See [`implementation.md`](implementation.md) for the full setup, milestone plan,
 ## Status
 
 - [x] M0 — Project plan, report skeleton, repo bootstrap
-- [ ] M1 — Foundations (Poetry, env, JSON logging, schemas, SQLite)
-- [ ] M2 — Telegram scraper
-- [ ] M3 — Instagram / X / WhatsApp scrapers
-- [ ] M4 — Processing pipeline
-- [ ] M5 — Intent analysis (Ollama)
+- [x] M1 — Foundations (Poetry, env, JSON logging, schemas, SQLite, parquet, NDJSON rotation)
+- [x] M2 — Telegram scraper (Telethon, single-channel + channels-file + search, live integration test enabled)
+- [x] M3 — Instagram / X / WhatsApp scrapers (Playwright, nitter-first for X, public metadata only for WA)
+- [ ] M4 — Heuristic pipeline (keyword scoring, intent classification, composite risk)
+- [ ] M5 — Intent analysis (Ollama local LLM)
 - [ ] M6 — Streamlit dashboard
 - [ ] M7 — Hardening & docs
+
+**Tests:** 63 passing + 1 live Telegram test (auto-skipped during rate-limit windows). All M3 scrapers replay against recorded HTML fixtures — no network needed for the test suite.
