@@ -2,6 +2,12 @@
 
 from __future__ import annotations
 
+import gzip
+import json
+from pathlib import Path
+
+import pytest
+
 from osint.processing.store import Store
 from osint.schemas import EnrichedEvent, RawEvent
 
@@ -61,3 +67,66 @@ def test_empty_upsert_is_noop(temp_data_dir) -> None:
     store = Store()
     assert store.upsert_many([]) == 0
     assert store.count() == 0
+
+
+def test_export_parquet(temp_data_dir) -> None:
+    pytest.importorskip("pyarrow")
+    store = Store()
+    store.upsert_many(_sample_events())
+
+    out = store.export_parquet()
+    assert out.exists()
+    assert out.suffix == ".parquet"
+
+    # Round-trip via pandas to confirm we can read it back.
+    import pandas as pd
+
+    df = pd.read_parquet(out)
+    assert len(df) == 3
+    assert set(df["platform"]) == {"telegram", "instagram", "x"}
+
+
+def test_ndjson_rotation_at_threshold(temp_data_dir, monkeypatch: pytest.MonkeyPatch) -> None:
+    """When the audit file crosses the threshold, it should be gzipped."""
+    store = Store()
+    # Force a tiny threshold so we can trigger rotation cheaply.
+    store.rotate_bytes = 200  # 200 bytes
+
+    # 1) Write a single event and verify no rotation yet.
+    store.upsert_many(_sample_events())
+    rotated_files = list(store.ndjson_path.parent.glob("events-*.ndjson.gz"))
+    assert rotated_files == []
+
+    # 2) Stuff the file past the threshold.
+    store.ndjson_path.write_text("x" * 1024, encoding="utf-8")
+
+    # 3) Next upsert triggers rotation.
+    store.upsert_many(_sample_events())
+
+    rotated_files = sorted(store.ndjson_path.parent.glob("events-*.ndjson.gz"))
+    assert len(rotated_files) == 1
+    # The rotated file is a valid gzip with the original payload.
+    with gzip.open(rotated_files[0], "rt", encoding="utf-8") as fh:
+        assert fh.read() == "x" * 1024
+    # The active file is fresh and small.
+    assert store.ndjson_path.stat().st_size < 1024
+
+
+def test_ndjson_rotation_disabled_with_zero_threshold(
+    temp_data_dir, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    store = Store()
+    store.rotate_bytes = 0  # explicit "off"
+    store.ndjson_path.write_text("x" * 1024, encoding="utf-8")
+    store.upsert_many(_sample_events())
+    assert list(store.ndjson_path.parent.glob("events-*.ndjson.gz")) == []
+
+
+def test_content_hash_persists_in_sqlite(temp_data_dir) -> None:
+    store = Store()
+    ev = RawEvent.from_scraped(platform="x", source="@h", text="hello world")
+    store.upsert_many([ev])
+
+    df = store.all_events()
+    assert df.iloc[0]["content_hash"] == ev.content_hash
+    assert len(df.iloc[0]["content_hash"]) == 64

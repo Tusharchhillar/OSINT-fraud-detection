@@ -26,7 +26,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     log.warning(
-        "cli.scrape.not_implemented",
+        "osint.cli.scrape.not_implemented",
         platform=args.platform,
         hint=f"Scraper for {args.platform!r} lands in a later milestone (M2/M3).",
     )

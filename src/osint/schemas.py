@@ -33,6 +33,18 @@ def make_event_id(platform: Platform, source: str, raw_id: str | None, text: str
     return f"{platform}-{digest}"
 
 
+def make_content_hash(text: str, urls: list[str] | None = None) -> str:
+    """Cross-paraphrase dedupe key: sha256 of normalized text + sorted URL stems.
+
+    Two messages with the same wording but different trackers will hash the same,
+    which is what we want for grouping paraphrased scam templates.
+    """
+    norm_text = (text or "").strip().lower()
+    url_stems = sorted({(u or "").split("?", 1)[0].lower() for u in (urls or [])})
+    payload = f"{norm_text}|{'|'.join(url_stems)}".encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
+
+
 _URL_RE = re.compile(r"https?://[^\s<>\"']+", re.IGNORECASE)
 
 
@@ -49,6 +61,14 @@ class RawEvent(BaseModel):
     text: str = ""
     urls: list[str] = Field(default_factory=list)
     media: list[str] = Field(default_factory=list, description="URLs or refs to media")
+    language: str | None = Field(
+        default=None,
+        description="ISO-639-1 code (e.g. 'en', 'hi'). Populated by the cleaner in M4.",
+    )
+    content_hash: str | None = Field(
+        default=None,
+        description="sha256 of normalized text+URLs. Used for cross-paraphrase dedupe in M4.",
+    )
     raw: dict[str, Any] = Field(default_factory=dict)
 
     @field_validator("urls", "media", mode="before")
@@ -72,9 +92,12 @@ class RawEvent(BaseModel):
         urls: list[str] | None = None,
         media: list[str] | None = None,
         timestamp: datetime | None = None,
+        language: str | None = None,
         raw: dict[str, Any] | None = None,
     ) -> "RawEvent":
-        """Convenience constructor that auto-fills ``event_id`` and URL extraction."""
+        """Convenience constructor that auto-fills ``event_id``, URL extraction, and
+        ``content_hash``.
+        """
         extracted = list(urls or [])
         if not extracted:
             extracted = _URL_RE.findall(text or "")
@@ -87,6 +110,8 @@ class RawEvent(BaseModel):
             text=text or "",
             urls=extracted,
             media=list(media or []),
+            language=language,
+            content_hash=make_content_hash(text or "", extracted),
             raw=raw or {},
         )
 

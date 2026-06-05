@@ -9,7 +9,7 @@ log = get_logger(__name__)
 
 def main() -> int:
     configure_logging()
-    log.warning("cli.dashboard.not_implemented", hint="Streamlit app lands in M6.")
+    log.warning("osint.cli.dashboard.not_implemented", hint="Streamlit app lands in M6.")
     print(
         "The Streamlit dashboard will be added in milestone M6.\n"
         "In the meantime, run:  poetry run osint-process --seed"

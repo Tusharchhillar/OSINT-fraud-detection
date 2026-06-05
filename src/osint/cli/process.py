@@ -73,7 +73,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.seed:
         events = _seed_events()
         inserted = store.upsert_many(events)
-        log.info("cli.process.seeded", inserted=inserted, total=store.count())
+        log.info("osint.cli.process.seeded", inserted=inserted, total=store.count())
         return 0
 
     if args.from_ndjson:
@@ -83,7 +83,7 @@ def main(argv: list[str] | None = None) -> int:
         after = len(cleaned)
         inserted = store.upsert_many(cleaned)
         log.info(
-            "cli.process.reingest",
+            "osint.cli.process.reingest",
             read=before,
             after_clean=after,
             inserted=inserted,
@@ -91,7 +91,7 @@ def main(argv: list[str] | None = None) -> int:
         )
         return 0
 
-    log.warning("cli.process.no_action", hint="pass --seed or --from-ndjson")
+    log.warning("osint.cli.process.no_action", hint="pass --seed or --from-ndjson")
     return 1
 
 

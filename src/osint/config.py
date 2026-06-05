@@ -65,6 +65,9 @@ class Settings:
     user_agent: str
     rate_per_min: int
 
+    # NDJSON audit-log rotation
+    ndjson_rotate_bytes: int
+
     @property
     def is_dev(self) -> bool:
         return self.env.lower() == "dev"
@@ -96,4 +99,5 @@ def get_settings() -> Settings:
             "Mozilla/5.0 (compatible; OSINT-Research/0.1; +contact-email)",
         ),
         rate_per_min=_get_int("SCRAPER_RATE_PER_MIN", 20),
+        ndjson_rotate_bytes=_get_int("OSINT_NDJSON_ROTATE_BYTES", 50 * 1024 * 1024),
     )
